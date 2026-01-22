@@ -119,7 +119,7 @@ func NewSearcher(startLang, startTitle, targetLang, targetTitle string) *Searche
 	}
 	http2.ConfigureTransport(tr)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
 	// Слова из Start (для backward эвристики)
 	startWords := make(map[string]bool)
@@ -138,7 +138,7 @@ func NewSearcher(startLang, startTitle, targetLang, targetTitle string) *Searche
 	}
 
 	return &Searcher{
-		client:      &http.Client{Transport: tr, Timeout: 800 * time.Millisecond},
+		client:      &http.Client{Transport: tr, Timeout: 1500 * time.Millisecond},
 		ctx:         ctx,
 		cancel:      cancel,
 		startLang:   startLang,
@@ -167,61 +167,40 @@ func (s *Searcher) heuristic(title, lang, dir string) int {
 
 	// Бонус за совпадение языка
 	if lang == targetLang {
-		score -= 25
+		score -= 20
 	}
 
-	// Бонус за общие слова с целью (усилен)
+	// Бонус за общие слова с целью
 	for _, word := range strings.Fields(titleLower) {
 		if len(word) > 2 && words[word] {
-			score -= 40
+			score -= 30
 		}
 	}
 
-	// Бонус за подстроку цели (усилен)
+	// Бонус за подстроку цели
 	for word := range words {
 		if strings.Contains(titleLower, word) {
-			score -= 20
+			score -= 15
 		}
 	}
 
-	// Бонус за английский и русский (больше interwiki)
-	if lang == "en" || lang == "ru" {
+	// Бонус за английский
+	if lang == "en" {
 		score -= 10
 	}
 
-	// Бонус за короткие названия (часто хабы)
-	if len(title) < 20 {
-		score -= 5
-	}
-
-	// Штраф за очень длинные названия
-	if len(title) > 60 {
-		score += 15
+	// Штраф за длинные названия
+	if len(title) > 50 {
+		score += 10
 	}
 
 	return score
 }
 
-// Быстрое определение языка по символам
-func guessLang(title string) string {
-	for _, r := range title {
-		if r >= 'А' && r <= 'я' || r == 'ё' || r == 'Ё' {
-			return "ru"
-		}
-	}
-	return "en"
-}
-
 // detectLang проверяет на каких языках существует статья
 func (s *Searcher) detectLang(title string) (string, string) {
-	// Быстрая проверка по символам - только ru и en
-	guessed := guessLang(title)
-	langs := []string{guessed}
-	if guessed == "ru" {
-		langs = append(langs, "en")
-	} else {
-		langs = append(langs, "ru")
-	}
+	// Приоритет языков для проверки
+	langs := []string{"ru", "en", "de", "fr", "es", "it", "uk", "pt"}
 
 	type result struct {
 		lang       string
@@ -230,7 +209,7 @@ func (s *Searcher) detectLang(title string) (string, string) {
 	}
 
 	results := make(chan result, len(langs))
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
 	defer cancel()
 
 	for _, lang := range langs {
@@ -554,7 +533,7 @@ func (s *Searcher) Search(start, end, lang string) []WikiNode {
 	}
 
 	const batchSize = 50
-	const maxPerRound = 250
+	const maxPerRound = 100
 
 	for !s.found.Load() && (pqF.Len() > 0 || pqB.Len() > 0) {
 		select {

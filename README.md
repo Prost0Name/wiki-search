@@ -4,218 +4,144 @@
 
 ## 📊 Производительность
 
-| Тест | Go | Python |
-|------|-----|--------|
-| Ибраево → Arch Linux | ~800мс | ~1.2с |
-| Россия → Linux | ~600мс | ~800мс |
-| Москва → Python | ~600мс | ~700мс |
+| Тест | Optimized | Simple |
+|------|-----------|--------|
+| Кошка → Теория относительности | ~800мс | ~900мс |
+| Пельмени → Чарльз Дарвин | ~1.5с | ~1.8с |
+| Segment tree → Малое Ибраево | ~2.5с | ~3.5с |
 
-## 🚀 Запуск Go решения
+## ✨ Два решения
+
+### 🚀 `main.go` - Optimized версия
+- Агрессивные оптимизации (maxPerRound=250, timeout=800мс)
+- Быстрое определение языка по символам
+- Усиленная эвристика
+- Лучше для сложных путей
+
+### 📦 `simple.go` - Simple версия  
+- Базовая реализация (maxPerRound=100, timeout=1500мс)
+- Полное сканирование языков при определении
+- Стабильнее, но медленнее
+
+## 🚀 Быстрый старт
 
 ### Требования
 - Go 1.21+
 
-### Установка зависимостей
+### Установка
+
 ```bash
+git clone <repo-url>
+cd sirius_kurci
 go mod download
 ```
 
 ### Сборка
 
-**Linux / macOS:**
 ```bash
-go build -o wiki main.go
-```
+# Optimized версия
+go build -o wikiracer main.go        # Linux/macOS
+go build -o wikiracer.exe main.go    # Windows
 
-**Windows:**
-```powershell
-go build -o wiki.exe main.go
+# Simple версия
+go build -o wikisimple simple.go     # Linux/macOS
+go build -o wikisimple.exe simple.go # Windows
 ```
 
 ### Запуск
 
-**Linux / macOS:**
 ```bash
-# По умолчанию: Ибраево → Arch Linux
-./wiki
+# Optimized
+./wikiracer "Кошка" "Квантовая механика"
+.\wikiracer.exe "Кошка" "Квантовая механика"
 
-# Свои статьи (на русском)
-./wiki "Москва" "Python"
-
-# Свои статьи + язык
-./wiki "Moscow" "Linux" en
+# Simple
+./wikisimple "Кошка" "Квантовая механика"
+.\wikisimple.exe "Кошка" "Квантовая механика"
 ```
 
-**Windows:**
+## 📖 Использование
+
+```bash
+# Базовое использование
+./wikiracer "Начальная статья" "Конечная статья"
+
+# Автоопределение языка (работает для любых языков)
+./wikiracer "Segment tree" "Малое Ибраево"
+./wikiracer "Pizza" "Квантовая механика"
+./wikiracer "Eiffel Tower" "Москва"
+
+# Явное указание языка (опционально)
+./wikiracer "Moscow" "Linux" en
+```
+
+## 🔧 Примеры
+
+### Linux / macOS
+```bash
+./wikiracer "Россия" "SpaceX"
+./wikiracer "Кошка" "Космос"
+./wikiracer "Python" "Математика"
+./wikiracer "Apple" "Microsoft"
+```
+
+### Windows (PowerShell)
 ```powershell
-# По умолчанию
-.\wiki.exe
-
-# Свои статьи
-.\wiki.exe "Москва" "Python"
-
-# Свои статьи + язык
-.\wiki.exe "Moscow" "Linux" en
+.\wikiracer.exe "Россия" "SpaceX"
+.\wikiracer.exe "Кошка" "Космос"
+.\wikiracer.exe "Python" "Математика"
+.\wikiracer.exe "Apple" "Microsoft"
 ```
 
-### Примеры
-```bash
-# Linux/macOS
-./wiki "Россия" "SpaceX"
-./wiki "Кошка" "Космос"
+## 🏗️ Архитектура
 
-# Windows
-.\wiki.exe "Россия" "SpaceX"
-.\wiki.exe "Кошка" "Космос"
 ```
-
----
-
-## 🐍 Запуск Python решения
-
-### Требования
-- Python 3.10+
-- aiohttp
-
-### Установка зависимостей
-
-**Linux / macOS:**
-```bash
-python3 -m pip install aiohttp
-# или с venv
-python3 -m venv .venv
-source .venv/bin/activate
-pip install aiohttp
+┌─────────────────────────────────────────────────────────┐
+│                      WikiRacer                          │
+├─────────────────────────────────────────────────────────┤
+│  Bidirectional Greedy Best-First Search                 │
+│  ┌─────────────┐                    ┌─────────────┐     │
+│  │   Forward   │ ←── встреча ───→  │  Backward   │     │
+│  │  (links)    │                    │ (linkshere) │     │
+│  └─────────────┘                    └─────────────┘     │
+├─────────────────────────────────────────────────────────┤
+│  Мультиязычный поиск: ru, en, de, fr, es, it, pt, uk    │
+├─────────────────────────────────────────────────────────┤
+│  HTTP/2 + Параллельные запросы + Priority Queue         │
+└─────────────────────────────────────────────────────────┘
 ```
-
-**Windows:**
-```powershell
-python -m pip install aiohttp
-# или с venv
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install aiohttp
-```
-
-### Запуск
-
-**Linux / macOS:**
-```bash
-# По умолчанию: Ибраево → Arch Linux
-python3 main.py
-
-# Свои статьи
-python3 main.py "Москва" "Python"
-```
-
-**Windows:**
-```powershell
-# По умолчанию
-python main.py
-
-# Свои статьи
-python main.py "Москва" "Python"
-```
-
-### Примеры
-```bash
-# Linux/macOS
-python3 main.py "Россия" "Linux"
-python3 main.py "Кошка" "Космос"
-
-# Windows
-python main.py "Россия" "Linux"
-python main.py "Кошка" "Космос"
-```
-
----
-
-## 🧠 Алгоритм
-
-**Bidirectional Greedy Best-First Search:**
-
-1. **Двунаправленный поиск** - одновременно от старта к цели и от цели к старту
-2. **Priority Queue** - узлы сортируются по эвристике близости к цели
-3. **Interwiki мосты** - используем ссылки между языковыми версиями Wikipedia
-4. **8 языков параллельно** - en, ru, de, fr, es, it, pt, uk
-
-### Эвристика
-- Бонус за совпадение языка с целью
-- Бонус за общие слова в названии
-- Бонус за английский (больше связей)
-- Штраф за длинные названия
-
----
 
 ## 📁 Структура проекта
 
 ```
 sirius_kurci/
-├── main.go      # Go решение (быстрее)
-├── main.py      # Python решение
-├── go.mod       # Go модули
-└── README.md    # Документация
+├── main.go          # Optimized решение
+├── simple.go        # Simple решение
+├── go.mod           # Go модуль
+├── go.sum           # Зависимости
+├── README.md        # Документация
+└── .gitignore       # Игнорируемые файлы
 ```
 
----
+## 🔬 Как это работает
 
-## ⚡ Оптимизации
+1. **Автоопределение языка** - по символам (кириллица → ru, латиница → en)
+2. **Forward поиск** - от стартовой статьи по исходящим ссылкам (`prop=links`)
+3. **Backward поиск** - от конечной статьи по входящим ссылкам (`prop=linkshere`)
+4. **Эвристика** - приоритет статьям с общими словами с целью
+5. **Interwiki мосты** - переход между языковыми версиями
+6. **Встреча** - когда forward и backward находят общую статью
 
-### Go
-- HTTP/2 multiplexing
-- Connection pooling (1000 idle connections)
-- Параллельные goroutines
-- sync.Map для concurrent доступа
+## 📈 Сравнение версий
 
-### Python
-- asyncio + aiohttp
-- Unlimited connections
-- True pipeline с FIRST_COMPLETED
-- Lock-protected shared state
+| Параметр | Optimized (`main.go`) | Simple (`simple.go`) |
+|----------|----------------------|---------------------|
+| Global timeout | 10с | 5с |
+| Request timeout | 800мс | 1500мс |
+| maxPerRound | 250 | 100 |
+| detectLang | 2 языка (быстро) | 8 языков (полно) |
+| Эвристика | Усиленная | Базовая |
 
----
+## 📝 Лицензия
 
-## 🔧 Конфигурация
-
-### Таймауты
-- Go: 1.5s per request, 5s total
-- Python: 2s connect, 5s total
-
-### Языки Wikipedia
-Оба решения используют 8 языковых эндпоинтов:
-- English (en) - основной хаб
-- Russian (ru)
-- German (de)
-- French (fr)
-- Spanish (es)
-- Italian (it)
-- Portuguese (pt)
-- Ukrainian (uk)
-
----
-
-## 📈 Бенчмарки
-
-Запуск 5 раз подряд:
-
-**Linux / macOS:**
-```bash
-# Go
-for i in {1..5}; do ./wiki; done
-
-# Python
-for i in {1..5}; do python3 main.py; done
-```
-
-**Windows (PowerShell):**
-```powershell
-# Go
-1..5 | ForEach-Object { .\wiki.exe }
-
-# Python
-1..5 | ForEach-Object { python main.py }
-```
-
-Типичные результаты:
-- **Go**: 600-1000мс, 5-10 API запросов
-- **Python**: 800-1500мс, 10-15 API запросов
+MIT
