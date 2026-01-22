@@ -103,10 +103,12 @@ type Searcher struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	targetLang  string
-	targetWords map[string]bool
+	startLang   string
+	startWords  map[string]bool // слова из Start (для backward)
+	targetWords map[string]bool // слова из End (для forward)
 }
 
-func NewSearcher(targetLang, targetTitle string) *Searcher {
+func NewSearcher(startLang, startTitle, targetLang, targetTitle string) *Searcher {
 	tr := &http.Transport{
 		MaxIdleConns:        1000,
 		MaxIdleConnsPerHost: 200,
@@ -119,6 +121,15 @@ func NewSearcher(targetLang, targetTitle string) *Searcher {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
+	// Слова из Start (для backward эвристики)
+	startWords := make(map[string]bool)
+	for _, word := range strings.Fields(strings.ToLower(startTitle)) {
+		if len(word) > 2 {
+			startWords[word] = true
+		}
+	}
+
+	// Слова из End (для forward эвристики)
 	targetWords := make(map[string]bool)
 	for _, word := range strings.Fields(strings.ToLower(targetTitle)) {
 		if len(word) > 2 {
@@ -130,30 +141,44 @@ func NewSearcher(targetLang, targetTitle string) *Searcher {
 		client:      &http.Client{Transport: tr, Timeout: 1500 * time.Millisecond},
 		ctx:         ctx,
 		cancel:      cancel,
+		startLang:   startLang,
+		startWords:  startWords,
 		targetLang:  targetLang,
 		targetWords: targetWords,
 	}
 }
 
 // Быстрая эвристика (меньше = лучше)
-func (s *Searcher) heuristic(title, lang string) int {
+// dir="F" -> ищем слова из End, dir="B" -> ищем слова из Start
+func (s *Searcher) heuristic(title, lang, dir string) int {
 	score := 100
 	titleLower := strings.ToLower(title)
 
+	// Выбираем целевые слова в зависимости от направления
+	var words map[string]bool
+	var targetLang string
+	if dir == "F" {
+		words = s.targetWords // Forward ищет End
+		targetLang = s.targetLang
+	} else {
+		words = s.startWords // Backward ищет Start
+		targetLang = s.startLang
+	}
+
 	// Бонус за совпадение языка
-	if lang == s.targetLang {
+	if lang == targetLang {
 		score -= 20
 	}
 
 	// Бонус за общие слова с целью
 	for _, word := range strings.Fields(titleLower) {
-		if len(word) > 2 && s.targetWords[word] {
+		if len(word) > 2 && words[word] {
 			score -= 30
 		}
 	}
 
 	// Бонус за подстроку цели
-	for word := range s.targetWords {
+	for word := range words {
 		if strings.Contains(titleLower, word) {
 			score -= 15
 		}
@@ -248,7 +273,7 @@ func (s *Searcher) fetch(titles []string, lang, dir string) []*WikiNode {
 			child := &WikiNode{
 				Title:    link.Title,
 				Lang:     lang,
-				Priority: s.heuristic(link.Title, lang),
+				Priority: s.heuristic(link.Title, lang, dir),
 			}
 			key := child.Key()
 
@@ -275,7 +300,7 @@ func (s *Searcher) fetch(titles []string, lang, dir string) []*WikiNode {
 			child := &WikiNode{
 				Title:    ll.Title,
 				Lang:     ll.Lang,
-				Priority: s.heuristic(ll.Title, ll.Lang),
+				Priority: s.heuristic(ll.Title, ll.Lang, dir),
 			}
 			key := child.Key()
 
@@ -487,7 +512,7 @@ func main() {
 	}
 
 	t0 := time.Now()
-	s := NewSearcher(lang, end)
+	s := NewSearcher(lang, start, lang, end)
 	path := s.Search(start, end, lang)
 
 	fmt.Printf("\n⏱️ %v | 📊 %d req\n", time.Since(t0), s.reqCount.Load())
