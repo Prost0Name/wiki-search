@@ -1,0 +1,39 @@
+# Binaries
+wiki
+wiki.exe
+wikiracer
+wikiracer.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go
+go.sum
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.Python
+pip-log.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
