@@ -197,6 +197,90 @@ func (s *Searcher) heuristic(title, lang, dir string) int {
 	return score
 }
 
+// detectLang проверяет на каких языках существует статья
+func (s *Searcher) detectLang(title string) (string, string) {
+	// Приоритет языков для проверки
+	langs := []string{"ru", "en", "de", "fr", "es", "it", "uk", "pt"}
+
+	type result struct {
+		lang       string
+		realTitle  string
+		found      bool
+	}
+
+	results := make(chan result, len(langs))
+	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	defer cancel()
+
+	for _, lang := range langs {
+		go func(l string) {
+			apiURL := wikiAPIs[l]
+			params := url.Values{
+				"action":    {"query"},
+				"format":    {"json"},
+				"titles":    {title},
+				"redirects": {"1"},
+			}
+
+			req, err := http.NewRequestWithContext(ctx, "GET", apiURL+"?"+params.Encode(), nil)
+			if err != nil {
+				results <- result{l, "", false}
+				return
+			}
+			req.Header.Set("User-Agent", "WikiRacer/5.0")
+
+			resp, err := s.client.Do(req)
+			if err != nil {
+				results <- result{l, "", false}
+				return
+			}
+			defer resp.Body.Close()
+
+			var data struct {
+				Query struct {
+					Pages map[string]struct {
+						Title   string `json:"title"`
+						Missing bool   `json:"missing"`
+					} `json:"pages"`
+				} `json:"query"`
+			}
+			if json.NewDecoder(resp.Body).Decode(&data) != nil {
+				results <- result{l, "", false}
+				return
+			}
+
+			for id, page := range data.Query.Pages {
+				if id != "-1" && !page.Missing {
+					results <- result{l, page.Title, true}
+					return
+				}
+			}
+			results <- result{l, "", false}
+		}(lang)
+	}
+
+	// Собираем результаты
+	foundLangs := make(map[string]string)
+	for i := 0; i < len(langs); i++ {
+		select {
+		case r := <-results:
+			if r.found {
+				foundLangs[r.lang] = r.realTitle
+			}
+		case <-ctx.Done():
+			break
+		}
+	}
+
+	// Возвращаем первый найденный по приоритету
+	for _, lang := range langs {
+		if realTitle, ok := foundLangs[lang]; ok {
+			return lang, realTitle
+		}
+	}
+	return "", ""
+}
+
 func (s *Searcher) fetch(titles []string, lang, dir string) []*WikiNode {
 	if s.found.Load() || len(titles) == 0 {
 		return nil
@@ -361,13 +445,50 @@ func (s *Searcher) buildPath(meet WikiNode) []WikiNode {
 }
 
 func (s *Searcher) Search(start, end, lang string) []WikiNode {
-	startNode := &WikiNode{Title: start, Lang: lang, Priority: 0}
-	endNode := &WikiNode{Title: end, Lang: lang, Priority: 0}
+	// Автоопределение языка для start и end
+	startLang, startTitle := lang, start
+	endLang, endTitle := lang, end
+
+	var wgDetect sync.WaitGroup
+	wgDetect.Add(2)
+
+	go func() {
+		defer wgDetect.Done()
+		if l, t := s.detectLang(start); l != "" {
+			startLang, startTitle = l, t
+		}
+	}()
+	go func() {
+		defer wgDetect.Done()
+		if l, t := s.detectLang(end); l != "" {
+			endLang, endTitle = l, t
+		}
+	}()
+	wgDetect.Wait()
+
+	// Обновляем целевые слова после определения языка
+	s.startLang = startLang
+	s.targetLang = endLang
+	s.startWords = make(map[string]bool)
+	for _, word := range strings.Fields(strings.ToLower(startTitle)) {
+		if len(word) > 2 {
+			s.startWords[word] = true
+		}
+	}
+	s.targetWords = make(map[string]bool)
+	for _, word := range strings.Fields(strings.ToLower(endTitle)) {
+		if len(word) > 2 {
+			s.targetWords[word] = true
+		}
+	}
+
+	startNode := &WikiNode{Title: startTitle, Lang: startLang, Priority: 0}
+	endNode := &WikiNode{Title: endTitle, Lang: endLang, Priority: 0}
 
 	s.visitedF.Store(startNode.Key(), (*WikiNode)(nil))
 	s.visitedB.Store(endNode.Key(), (*WikiNode)(nil))
 
-	if start == end {
+	if startTitle == endTitle && startLang == endLang {
 		return []WikiNode{*startNode}
 	}
 
@@ -384,14 +505,14 @@ func (s *Searcher) Search(start, end, lang string) []WikiNode {
 	wg0.Add(2)
 	go func() {
 		defer wg0.Done()
-		nodes := s.fetch([]string{start}, lang, "F")
+		nodes := s.fetch([]string{startTitle}, startLang, "F")
 		muF0.Lock()
 		initF = nodes
 		muF0.Unlock()
 	}()
 	go func() {
 		defer wg0.Done()
-		nodes := s.fetch([]string{end}, lang, "B")
+		nodes := s.fetch([]string{endTitle}, endLang, "B")
 		muB0.Lock()
 		initB = nodes
 		muB0.Unlock()
