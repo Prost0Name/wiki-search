@@ -86,6 +86,7 @@ type WikiResponse struct {
 		Pages map[string]struct {
 			Title     string                   `json:"title"`
 			Links     []struct{ Title string } `json:"links"`
+			LinksHere []struct{ Title string } `json:"linkshere"`
 			LangLinks []LangLink               `json:"langlinks"`
 		} `json:"pages"`
 	} `json:"query"`
@@ -177,15 +178,32 @@ func (s *Searcher) fetch(titles []string, lang, dir string) []*WikiNode {
 	}
 
 	apiURL := wikiAPIs[lang]
-	params := url.Values{
-		"action":      {"query"},
-		"format":      {"json"},
-		"prop":        {"links|langlinks"},
-		"titles":      {strings.Join(titles, "|")},
-		"pllimit":     {"max"},
-		"lllimit":     {"max"},
-		"plnamespace": {"0"},
-		"redirects":   {"1"},
+	var params url.Values
+
+	if dir == "F" {
+		// Forward: исходящие ссылки (куда ссылается статья)
+		params = url.Values{
+			"action":      {"query"},
+			"format":      {"json"},
+			"prop":        {"links|langlinks"},
+			"titles":      {strings.Join(titles, "|")},
+			"pllimit":     {"max"},
+			"lllimit":     {"max"},
+			"plnamespace": {"0"},
+			"redirects":   {"1"},
+		}
+	} else {
+		// Backward: входящие ссылки (кто ссылается НА статью)
+		params = url.Values{
+			"action":      {"query"},
+			"format":      {"json"},
+			"prop":        {"linkshere|langlinks"},
+			"titles":      {strings.Join(titles, "|")},
+			"lhlimit":     {"max"},
+			"lllimit":     {"max"},
+			"lhnamespace": {"0"},
+			"redirects":   {"1"},
+		}
 	}
 
 	req, _ := http.NewRequestWithContext(s.ctx, "GET", apiURL+"?"+params.Encode(), nil)
@@ -218,7 +236,15 @@ func (s *Searcher) fetch(titles []string, lang, dir string) []*WikiNode {
 		}
 		parent := WikiNode{Title: page.Title, Lang: lang}
 
-		for _, link := range page.Links {
+		// Выбираем правильный источник ссылок
+		var links []struct{ Title string }
+		if dir == "F" {
+			links = page.Links
+		} else {
+			links = page.LinksHere
+		}
+
+		for _, link := range links {
 			child := &WikiNode{
 				Title:    link.Title,
 				Lang:     lang,
