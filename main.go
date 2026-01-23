@@ -664,6 +664,38 @@ func main() {
 		for i, n := range path {
 			fmt.Printf("  %d. %s\n", i+1, n)
 		}
+
+		// Выводим ссылки для проверки
+		fmt.Println("\n🔗 Проверка (ссылки на статьи):")
+		for i, n := range path {
+			wikiURL := fmt.Sprintf("https://%s.wikipedia.org/wiki/%s",
+				n.Lang, strings.ReplaceAll(url.PathEscape(n.Title), "%2F", "/"))
+			fmt.Printf("  %d. %s\n", i+1, wikiURL)
+		}
+
+		// Показываем переходы
+		fmt.Println("\n📍 Переходы (где искать ссылку):")
+		fmt.Println("   ⚠️  Путь найден bidirectional поиском - некоторые связи могут быть backlinks")
+		fmt.Println("   (т.е. B ссылается на A, а не A на B)")
+		fmt.Println()
+		for i := 0; i < len(path)-1; i++ {
+			from := path[i]
+			to := path[i+1]
+			if from.Lang == to.Lang {
+				// Внутри одного языка - ссылка в статье
+				fmt.Printf("  %s → %s\n", from.Title, to.Title)
+				// Проверить в обе стороны
+				fmt.Printf("     Проверить: https://%s.wikipedia.org/wiki/%s\n",
+					from.Lang, strings.ReplaceAll(url.PathEscape(from.Title), "%2F", "/"))
+				fmt.Printf("     Или обратно: https://%s.wikipedia.org/wiki/%s\n",
+					to.Lang, strings.ReplaceAll(url.PathEscape(to.Title), "%2F", "/"))
+			} else {
+				// Interwiki переход
+				fmt.Printf("  %s → %s (interwiki)\n", from, to)
+				fmt.Printf("     Слева 'Languages': https://%s.wikipedia.org/wiki/%s\n",
+					from.Lang, strings.ReplaceAll(url.PathEscape(from.Title), "%2F", "/"))
+			}
+		}
 	} else {
 		fmt.Println("❌ Не найден")
 	}
