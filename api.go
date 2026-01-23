@@ -48,6 +48,22 @@ var apiWikiAPIs = map[string]string{
 	"uk": "https://uk.wikipedia.org/w/api.php",
 }
 
+// Глобальный HTTP клиент с прогретыми соединениями
+var globalHTTPClient *http.Client
+
+func initGlobalClient() {
+	tr := &http.Transport{
+		MaxIdleConns:        1000,
+		MaxIdleConnsPerHost: 200,
+		MaxConnsPerHost:     0,
+		IdleConnTimeout:     90 * time.Second,
+		DisableCompression:  false,
+		ForceAttemptHTTP2:   true,
+	}
+	http2.ConfigureTransport(tr)
+	globalHTTPClient = &http.Client{Transport: tr, Timeout: 800 * time.Millisecond}
+}
+
 // SearchRequest - запрос на поиск пути
 type SearchRequest struct {
 	From string `json:"from" example:"Кошка" validate:"required"`
@@ -182,16 +198,6 @@ type APISearcher struct {
 }
 
 func NewAPISearcher(startLang, startTitle, targetLang, targetTitle string) *APISearcher {
-	tr := &http.Transport{
-		MaxIdleConns:        1000,
-		MaxIdleConnsPerHost: 200,
-		MaxConnsPerHost:     0,
-		IdleConnTimeout:     30 * time.Second,
-		DisableCompression:  false,
-		ForceAttemptHTTP2:   true,
-	}
-	http2.ConfigureTransport(tr)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
 	startWords := make(map[string]bool)
@@ -209,7 +215,7 @@ func NewAPISearcher(startLang, startTitle, targetLang, targetTitle string) *APIS
 	}
 
 	return &APISearcher{
-		client:      &http.Client{Transport: tr, Timeout: 800 * time.Millisecond},
+		client:      globalHTTPClient,
 		ctx:         ctx,
 		cancel:      cancel,
 		startLang:   startLang,
@@ -897,7 +903,40 @@ func HealthCheck(c *fiber.Ctx) error {
 	})
 }
 
+// warmupConnections прогревает HTTP/2 соединения ко всем Wikipedia API
+// Это убирает 200-300мс на первый запрос (TCP + TLS + HTTP/2 handshake)
+func warmupConnections() {
+	var wg sync.WaitGroup
+	for lang, apiURL := range apiWikiAPIs {
+		wg.Add(1)
+		go func(l, u string) {
+			defer wg.Done()
+			params := url.Values{
+				"action": {"query"},
+				"format": {"json"},
+				"meta":   {"siteinfo"},
+			}
+			req, _ := http.NewRequest("GET", u+"?"+params.Encode(), nil)
+			req.Header.Set("User-Agent", "WikiRacer/5.0")
+			resp, err := globalHTTPClient.Do(req)
+			if err == nil {
+				resp.Body.Close()
+				fmt.Printf("✓ %s wiki warmed up\n", l)
+			}
+		}(lang, apiURL)
+	}
+	wg.Wait()
+}
+
 func main() {
+	// Инициализация глобального HTTP клиента
+	initGlobalClient()
+
+	// Прогрев соединений при старте
+	fmt.Println("🔥 Прогрев соединений к Wikipedia...")
+	warmupConnections()
+	fmt.Println("✅ Соединения готовы!")
+
 	app := fiber.New(fiber.Config{
 		AppName: "WikiRacer API v1.0.0",
 	})
