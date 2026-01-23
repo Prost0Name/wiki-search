@@ -3,13 +3,10 @@ wiki
 wiki.exe
 wikiracer
 wikiracer.exe
-*.exe
+wikiracer-api.exe
 *.dll
 *.so
 *.dylib
-
-# Go
-go.sum
 
 # Python
 .venv/
